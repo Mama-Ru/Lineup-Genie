@@ -2,7 +2,7 @@
 
 This repository houses the statistical models, data analysis, and mathematical distributions for APA (American Poolplayers Association) league play. By applying data science to match history, this project quantifies player performance and variance to optimize handicap tracking.
 
-## 📐 Mathematical Configurations & Methodology
+## 📐 Mathematical Methodology & Supporting Data
 
 The tables in this repository rely on large-scale datasets to ensure high statistical confidence and minimize sample bias:
 
