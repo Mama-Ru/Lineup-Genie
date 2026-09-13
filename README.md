@@ -13,6 +13,3 @@ The tables in this repository rely on large-scale datasets to ensure high statis
 
 1. Download or clone this repository to your local machine.
 2. If your scripts require database credentials or local configurations, create a `.env` file in the root directory.
-
-## 📜 License
-This project is for personal and internal data analysis use.
