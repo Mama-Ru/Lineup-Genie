@@ -1,9 +1,18 @@
 from lg_classes import Lineup, Player
 from predictor import Predictor
+from threading import Thread
 import customtkinter as ctk
 from typing import Any
 from PIL import Image
 import apa_client
+import sys
+import ctypes
+import json
+
+if sys.platform == "win32":
+    hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+    if hwnd != 0:
+        ctypes.windll.user32.ShowWindow(hwnd, 0)
 
 apa = apa_client.APA()
 
@@ -18,6 +27,23 @@ class GenieFrame(ctk.CTkFrame):
             self.rowconfigure(r, weight=1)
         for c in range(columns):
             self.columnconfigure(c, weight=1)
+
+class GenieLabel(ctk.CTkLabel):
+    def __init__(self, master: Any, text: str, text_color: str, **kwargs):
+        super().__init__(master, text=text, text_color=text_color, **kwargs)
+
+        self.text = text
+        self.color = text_color
+
+    def config_text(self, text: str, color: str):
+        self.text = text
+        self.color = color
+        self.configure(text=text, text_color=color)
+
+class GenieEntry(ctk.CTkEntry):
+    def __init__(self, master: Any, text: str | None = None, **kwargs):
+        self.text = ctk.StringVar(value=text)
+        super().__init__(master, textvariable=self.text, **kwargs)
 
 class GenieApp(ctk.CTk):
     def __init__(self, rows, columns):
@@ -53,6 +79,10 @@ class GenieApp(ctk.CTk):
         self.iconbitmap("assets/genie.ico") 
 
         self.create_widgets()
+
+        # Extra
+        self.keep = set()
+        self.status_created = False
 
     def grid(self, widget: ctk.CTkBaseClass, **kwargs: Any) -> None:
         """Intercepts grid parameters from kwargs to keep them within boundaries."""
@@ -93,8 +123,27 @@ class GenieApp(ctk.CTk):
         )
 
     def clean(self, frame: ctk.CTkFrame) -> None:
-        for widget in frame.winfo_children():
-            widget.destroy()
+        """Recursively destroys unlisted widgets and hides widgets in 'keep'."""
+        
+        def _recursive_clean(widget):
+            if widget in self.keep:
+                widget.pack_forget()
+                widget.grid_forget()
+                widget.place_forget()
+                return
+            
+            if hasattr(widget, "winfo_children"):
+                for child in widget.winfo_children():
+                    _recursive_clean(child)
+            
+            if not hasattr(widget, "winfo_children") or not widget.winfo_children():
+                widget.destroy()
+
+        for top_widget in frame.winfo_children():
+            _recursive_clean(top_widget)
+
+    def modify_label(self, widget: ctk.CTkLabel, text: str, color: str):
+        widget.configure(text=text, color=color)
 
     # ABOUT
     def about(self):
@@ -145,29 +194,7 @@ class GenieApp(ctk.CTk):
         )
 
     # SEARCH
-    def sp_button(self, name: str, status_widget: ctk.CTkLabel):
-        players = apa.search_player(name)
-        
-        if not players:
-            status_widget.configure(text="No Player Found!", text_color="red")
-            return
-
-        status_widget.configure(text=f"{name} Found!", text_color="green")
-
-        player = players[0]
-        alias_id = player["aliases"][-1]["id"]
-
-        status_widget.configure(text=f"Fetching Teams!", text_color="yellow")
-
-        team_data = apa.get_teams(alias_id)
-        current_teams = team_data["alias"].get("currentTeams", [])
-        
-        player_level = next(
-            record["skillLevel"]
-            for record in current_teams
-            if record["__typename"] == "EightBallPlayer"
-        )
-    
+    def get_matches(self, player: dict, alias_id: int, player_level: int) -> tuple[str, str]: 
         matches = apa.get_player_matches(
             alias_id=alias_id,
             days=365,
@@ -175,60 +202,96 @@ class GenieApp(ctk.CTk):
             target_sl=player_level
         )
 
-        print(f"{player['firstName']} {player['lastName']}")
-        print(apa.get_skill_level(matches, player_level))
+        name = f"{player['firstName']} {player['lastName']}"
+        return name, apa.get_skill_level(matches, player_level)
 
-    def st_button(self, name: str, status_widget: ctk.CTkLabel):
-        team = apa.find_team(name)
-        
-        if not team:
-            status_widget.configure(text="No Team Found!", text_color="red")
-            return
+    def sp_button(self, name: str, status_widget: GenieLabel) -> None:
+        def worker():
+            self.search_player_button.configure(state="disabled")
 
-        print(team)
+            status_widget.config_text("Fetching Player!", "yellow")
+            players = apa.search_player(name)
 
-        status_widget.configure(text=f"{name} Found!", text_color="green")
+            if not players:
+                status_widget.config_text("No Player Found!", "red")
+                return
+            try:
+                player = players[0]
+                alias_id = player["aliases"][-1]["id"]
+
+                found_name = f"{player['firstName']} {player['lastName']}"
+
+                team_data = apa.get_teams(alias_id)
+                current_teams = team_data["alias"].get("currentTeams", [])
+
+                player_level = next(
+                    record["skillLevel"]
+                    for record in current_teams
+                    if record["__typename"] == "EightBallPlayer"
+                )
+
+                status_widget.config_text(f"{found_name} Found!", "green")
+            except:
+                status_widget.config_text("No Player Found!", "red")
+                return
+
+            def worker():
+                name, skill_level = self.get_matches(
+                    player,
+                    alias_id,
+                    player_level
+                )
+
+                self.after(0, lambda: status_widget.config_text(f"{name}, {skill_level}", "green"))
+                self.after(0, lambda: self.search_player_button.configure(state="normal"))
+
+            Thread(target=worker, daemon=True).start()
+        Thread(target=worker, daemon=True).start()
         
     def search(self):
-        status_container = GenieFrame(self.content_frame, rows=1, columns=2, fg_color="transparent")
-        self.grid(status_container, row=0, column=0, columnspan=10, sticky="")
+        def _text_switcher():
+            if self.switch.get() == 0:
+                self.switch.configure(text="Friendly")
+            else:
+                self.switch.configure(text="Opponent")
+                
+        if not self.status_created:
+            self.status_container = GenieFrame(self.content_frame, rows=1, columns=4, fg_color="transparent")
+            self.status_val = GenieLabel(self.status_container, text="___", text_color="yellow", anchor="w", font=("Trebuchet MS", 15, "bold"))
+            self.switch = ctk.CTkSwitch(
+                self.content_frame,
+                text="Ally",
+                command=_text_switcher
+            )
+            self.search_player = GenieEntry(
+                self.content_frame,
+                justify="center"
+            )
 
-        status = ctk.CTkLabel(status_container, text="Status: ", anchor="e", font=("Trebuchet MS", 20, "bold"))
-        status_val = ctk.CTkLabel(status_container, text="___", text_color="yellow", anchor="w", font=("Trebuchet MS", 20, "bold"))
+            self.keep.add(self.status_container)
+            self.keep.add(self.status_val)
+            self.keep.add(self.switch)
+            self.keep.add(self.search_player)
 
-        self.grid(status, row=0, column=0)
-        self.grid(status_val, row=0, column=1)
+            self.status_created = True
 
-        search_player_box = ctk.CTkEntry(
-            self.content_frame,
-            placeholder_text="Player Name",
-            justify="center"
-        )
-        self.grid(search_player_box, row=1, column=0, columnspan=5)
+        self.grid(self.status_container, row=0, column=0, columnspan=10, sticky="")
+        self.grid(self.switch, row=0, column=0, columnspan=2)
 
-        search_player_button = ctk.CTkButton(
+        status = ctk.CTkLabel(self.status_container, text="Status: ", anchor="e", font=("Trebuchet MS", 15, "bold"))
+
+        self.grid(status, row=0, column=2)
+        self.grid(self.status_val, row=0, column=3)
+        self.grid(self.search_player, row=1, column=0, columnspan=5)
+
+        self.search_player_button = ctk.CTkButton(
             self.content_frame,
             text="🔍 Search Player",
-            command=lambda: self.sp_button(search_player_box.get(), status_val)
+            command=lambda: self.sp_button(self.search_player.get(), self.status_val)
         )
-        self.grid(search_player_button, row=1, column=5, columnspan=5)
+        self.grid(self.search_player_button, row=1, column=5, columnspan=5)
 
-
-        search_team_box = ctk.CTkEntry(
-            self.content_frame,
-            placeholder_text="Team Name",
-            justify="center"
-        )
-        self.grid(search_team_box, row=2, column=0, columnspan=5)
-
-        search_team_button = ctk.CTkButton(
-            self.content_frame,
-            text="🔍 Search Team",
-            command=lambda: self.st_button(search_team_box.get(), status_val)
-        )
-        self.grid(search_team_button, row=2, column=5, columnspan=5)
-
-        filler = GenieFrame(self.content_frame, 1, 1)
+        filler = GenieFrame(self.content_frame, 1, 1, fg_color="transparent")
         self.grid(filler, row=3, column=0, rowspan=7, columnspan=10)
 
     def lineups(self):
