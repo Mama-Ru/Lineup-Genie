@@ -105,3 +105,15 @@ class PGHResult(TypedDict):
     """The point at which is half of the length of lineups."""
     cutoff_score: float
     """The score to which it can go past the 50% mark due to duplicate/same result lineups."""
+
+class PlayerJSON(TypedDict):
+    """What the players' JSON cache stores"""
+
+    name: str
+    """The player's name."""
+    id: int
+    """The player's ID"""
+    sl: str
+    """The player's skill level."""
+    date: str
+    """The ISO 8601 string timestamp of capture to check for expiration of data."""

@@ -118,10 +118,10 @@ class Predictor:
         """
 
         half_point = len(lineups) // 2
-        cutoff_score = lineups[half_point - 1]["total_points"]
+        cutoff_score = lineups[half_point - 1]['total_points']
 
         counter = sum(
-            lineup["total_points"] >= cutoff_score
+            lineup['total_points'] >= cutoff_score
             for lineup in reduced_lineups
         )
 

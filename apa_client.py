@@ -353,12 +353,12 @@ class APA:
         result: dict[str, Any] = response.json()[0]
 
         if result.get("errors"):
-            raise RuntimeError(result["errors"])
+            raise RuntimeError(result['errors'])
 
         self.access_token = (
-            result["data"]
-            ["generateAccessToken"]
-            ["accessToken"]
+            result['data']
+            ['generateAccessToken']
+            ['accessToken']
         )
 
         return self.access_token
@@ -375,9 +375,9 @@ class APA:
 
         payload = [
             {
-                "operationName": operation_name,
-                "variables": variables,
-                "query": query,
+                'operationName': operation_name,
+                'variables': variables,
+                'query': query,
             }
         ]
 
@@ -388,9 +388,9 @@ class APA:
             result = self._send_authenticated_request(payload)
 
         if result.get("errors"):
-            raise RuntimeError(result["errors"])
+            raise RuntimeError(result['errors'])
 
-        return result["data"]
+        return result['data']
 
     def _send_authenticated_request(self, payload: list[Any]) -> dict[str, Any]:
         """Sends an authorized request."""
@@ -436,11 +436,11 @@ class APA:
             operation_name="Search",
             query=self.SEARCH_QUERY,
             variables={
-                "query": search_text,
+                'query': search_text,
             },
         )
 
-        return data["search"]["hits"]
+        return data['search']['hits']
 
     def search_player(self, name: str) -> list[Any]:
         """Searches for a player using _search()."""
@@ -483,7 +483,7 @@ class APA:
             },
         )
 
-        return data["division"]["matches"]
+        return data['division']['matches']
 
     def get_teams(self, alias_id: int) -> dict[str, Any]:
         """Gets more data from a team."""
@@ -504,15 +504,15 @@ class APA:
         team_data = self.get_teams(alias_id)
 
         records = (
-            team_data["alias"].get("currentTeams", [])
-            + team_data["alias"].get("pastTeams", [])
+            team_data['alias'].get("currentTeams", [])
+            + team_data['alias'].get("pastTeams", [])
         )
 
         # Keep only the player's current format.
         current_type = None
 
         current_teams = (
-            team_data["alias"]
+            team_data['alias']
             .get("currentTeams", [])
         )
 
@@ -592,7 +592,7 @@ class APA:
         # The same team match could theoretically appear
         # more than once, so deduplicate.
         unique_matches = {
-            str(match["id"]): match
+            str(match['id']): match
             for match in all_matches
         }
 
@@ -666,7 +666,7 @@ class APA:
                     continue
 
                 results.append({
-                    "date": team_match["startTime"],
+                    "date": team_match['startTime'],
                     "player_sl": player_sl,
                     "opponent_sl": opponent_sl,
                     "points": player_side.get("points"),
@@ -710,16 +710,16 @@ if __name__ == "__main__":
         raise LookupError(f"Player not found: {player_name}")
 
     player = players[0]
-    alias_id = player["aliases"][-1]["id"]
+    alias_id = player['aliases'][-1]['id']
 
     team_data = apa.get_teams(alias_id)
 
-    current_teams = team_data["alias"].get("currentTeams", [])
+    current_teams = team_data['alias'].get("currentTeams", [])
 
     player_level = next(
-        record["skillLevel"]
+        record['skillLevel']
         for record in current_teams
-        if record["__typename"] == "EightBallPlayer"
+        if record['__typename'] == "EightBallPlayer"
     )
 
     matches = apa.get_player_matches(
