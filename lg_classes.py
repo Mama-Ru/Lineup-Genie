@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Self
+from typing import Literal, TypedDict
 
 class Player:
     """A class that stores a player's name, level, and additional skill within their level."""
@@ -44,7 +44,7 @@ class Lineup:
         
         self.lineup.append(player)
     
-    def add_players(self, players: list[Player]) -> list[Player] | None:
+    def add_players(self, players: list[Player]) -> list[Player]:
         """Adds multiple players to the lineup at once.
         
         Args:
@@ -52,24 +52,22 @@ class Lineup:
         """
         for player in players:
             self.add_player(player)
-            return self.lineup
 
-    def del_player(self, player: Player, return_lineup: bool = False) -> list[Player] | None:
+        return self.lineup
+
+    def del_player(self, player: Player) -> list[Player]:
         """Removes a player from the lineup.
 
         Args:
             player: The player to remove from the lineup.
+
+        Returns:
+            The lineup without that player, otherwise the lineup.
         """
         if player in self.lineup:
-            if return_lineup:
-                lineup = self.lineup.copy()
-            else:
-                lineup = self.lineup
-
-            lineup.remove(player)
-
-            if return_lineup:
-                return lineup
+            self.lineup.remove(player)
+            
+        return self.lineup
 
     def clear_lineup(self) -> None:
         """Clears the lineup from players."""
